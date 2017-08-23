@@ -1,0 +1,116 @@
+#!/bin/bash
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2017 Kogo Software LLC
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+set -e
+
+cleanIncludes=''
+includesDir=./include
+libsDir=./libs
+nginxVersion=''
+scriptName="$(basename $0)"
+
+code_bold="\x1b[1m"
+code_dim="\x1b[2m"
+code_green="\x1b[32m"
+code_red="\x1b[31m"
+code_reset_all="\x1b[0m"
+code_terminal_reset="\033c"
+code_underlined="\x1b[4m"
+
+function error {
+  echo "$scriptName: $1" >&2
+}
+
+function help() {
+echo -e "
+${code_bold}$scriptName${code_reset_all}
+
+Downloads nginx source into your working directory for local development.
+
+${code_underlined}SYNOPSIS${code_reset_all}
+
+Downloads <nginx-version> to /tmp.  Untars source to libs/nginx-<nginx-version>.  Creates symlinks for all headers in the include/ directory.
+
+${code_underlined}USAGE${code_reset_all}
+
+$scriptName OPTIONS
+
+${code_underlined}OPTIONS${code_reset_all}
+
+-h, --help)
+
+  Print this message.
+
+--nginx-version)
+
+  The version of nginx to download e.g. --nginx-version 1.11.5
+"
+}
+
+function assertTruthy() {
+  if [[ -z "$2" ]]; then
+    error "$1 was empty!"
+    exit 1
+  fi
+}
+
+while [ "$#" != '0' ];do
+  case "$1" in
+    -h|--help)
+      help
+      exit;;
+    --nginx-version)
+      nginxVersion="$2"
+      shift 2;;
+    *)
+      error "Unknown option $1"
+      exit 1;;
+  esac
+done
+
+assertTruthy --nginx-version "$nginxVersion"
+
+mkdir -p "$includesDir" "$libsDir"
+
+nginxTarball="nginx-${nginxVersion}.tar.gz"
+if [[ ! -f "/tmp/$nginxTarball" ]]; then
+  curl -o "/tmp/$nginxTarball" "http://nginx.org/download/$nginxTarball"
+fi
+
+tar -C "$libsDir" -zxf "/tmp/$nginxTarball"
+
+for header in `find "$libsDir/nginx-${nginxVersion}/" -type f -name '*.h'`;do
+  file="$includesDir/`basename $header`"
+  if [[ -L "$file" ]]; then
+    rm "$file"
+  fi
+
+  if [[ ! -f "$file" ]]; then
+    ln -s "../$header" "$file"
+  fi
+done
+
+rm -f "$libsDir/nginx-src"
+ln -s "nginx-$nginxVersion" "$libsDir/nginx-src"
+rm -f "/tmp/$nginxTarball"
