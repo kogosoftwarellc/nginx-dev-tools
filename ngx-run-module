@@ -25,58 +25,30 @@
 set -e
 
 scriptName="$(basename $0)"
-
-function help() {
-echo -e "
-${code_bold}$scriptName${code_reset_all}
-
-Downloads nginx source into your working directory for local development.
-
-${code_underlined}SYNOPSIS${code_reset_all}
-
-Downloads <nginx-version> to /tmp.  Untars source to libs/nginx-<nginx-version>.  Creates symlinks for all headers in the include/ directory.
-
-${code_underlined}USAGE${code_reset_all}
-
-$scriptName OPTIONS
-
-${code_underlined}OPTIONS${code_reset_all}
-
--h, --help)
-
-  Print this message.
-
---nginx-version)
-
-  The version of nginx to download e.g. --nginx-version 1.11.5
-"
-}
-
 source `which ngx-helpers`
 
+export `grep 'ngx_module_name=' src/config`
+
 assertNgxVersion
+assertModuleName
 
-mkdir -p "$includesDir" "$libsDir"
-
-nginxTarball="nginx-${NGX_VERSION}.tar.gz"
-if [[ ! -f "/tmp/$nginxTarball" ]]; then
-  curl -o "/tmp/$nginxTarball" "http://nginx.org/download/$nginxTarball"
+tmpDir="/tmp/$projectName"
+if [[ -d "$tmpDir" ]]; then
+  rm -rf "$tmpDir"
 fi
+mkdir -p "$tmpDir"
+cp $NGX_TEST_SRCS "$tmpDir"
 
-tar -C "$libsDir" -zxf "/tmp/$nginxTarball"
+cat > "$tmpDir/Dockerfile" <<~
+FROM nginx:$NGX_VERSION
 
-for header in `find "$libsDir/nginx-${NGX_VERSION}/" -type f -name '*.h'`;do
-  file="$includesDir/`basename $header`"
-  if [[ -L "$file" ]]; then
-    rm "$file"
-  fi
+ADD nginx.conf /etc/nginx/nginx.conf
+ADD ${ngx_module_name}.so /etc/nginx/modules/${ngx_module_name}.so
+~
 
-  if [[ ! -f "$file" ]]; then
-    ln -s "../$header" "$file"
-  fi
-done
+testContainerName="$projectName-test"
+docker build -t "$testContainerName" "$tmpDir"
+docker rm -f "$testContainerName" || true
+docker run -d -p 80:80 --name "$testContainerName" "$testContainerName"
 
-rm -f "$libsDir/nginx-src"
-ln -s "nginx-$NGX_VERSION" "$libsDir/nginx-src"
-rm -f "/tmp/$nginxTarball"
 logScriptComplete
