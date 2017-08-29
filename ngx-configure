@@ -35,6 +35,10 @@ if [[ ! -d src ]]; then
   exit 1
 fi
 
+prefixDir="$PWD/build"
+mkdir -p "$prefixDir"
 cd libs/nginx-src
-./configure --with-compat "--add-dynamic-module=../../src"
+CFLAGS="-g -O0" ./configure --prefix="$prefixDir" --with-compat "--add-dynamic-module=../../src"
+make
+make install
 logScriptComplete

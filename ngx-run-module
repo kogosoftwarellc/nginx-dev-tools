@@ -44,6 +44,7 @@ FROM nginx:$NGX_VERSION
 
 ADD nginx.conf /etc/nginx/nginx.conf
 ADD ${ngx_module_name}.so /etc/nginx/modules/${ngx_module_name}.so
+$NGX_ADDTL_DOCKER_DIRECTIVES
 ~
 
 testContainerName="$projectName-test"
